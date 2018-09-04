@@ -48,22 +48,22 @@ class WifiController(object):
 
     def set_cli_mode(self, ssid, password):
         """Goes into CLI_MODE, i.e. connects to an available wifi network using the given ssid and password."""
+        run(("dhcpcd", "--release", self.interface))
+        run(("service", "dhcpcd", "stop"))
         # Hashes the password (-> PSK) and generates an entry for wpa_supplicant.conf
         entry = run(("/usr/bin/wpa_passphrase", ssid, password)).decode()
         entry = re.sub(r'\t*#psk="[^\n"]+"\n', "", entry)  # removes plain text password
-        replace_in_file(self.WPA_SUPPLICANT_CONF, r"#<begin_raspiwifi_entry>.+#<end_raspiwifi_entry>", "", regex=True)
+        replace_in_file(self.WPA_SUPPLICANT_CONF, r"#<begin_sun2plug_entry>.+#<end_sun2plug_entry>", "", regex=True)
         with open(self.WPA_SUPPLICANT_CONF, "a") as wpa_sup:
-            wpa_sup.write("\n#<begin_raspiwifi_entry>\n" + entry + "#<end_raspiwifi_entry>\n")
+            wpa_sup.write("\n#<begin_sun2plug_entry>\n" + entry + "#<end_sun2plug_entry>\n")
 
-        replace_in_file(self.DHCPCD_CONF, r"#<begin_raspiwifi_entry>.+#<end_raspiwifi_entry>", "", regex=True)
-        run(("service", "dhcpcd", "restart"))
+        replace_in_file(self.DHCPCD_CONF, r"#<begin_sun2plug_entry>.+#<end_sun2plug_entry>", "", regex=True)
+        # run(("service", "dhcpcd", "restart"))
 
         # Stop & disable hostapd and dnsmasq services
         run(("systemctl", "stop", "hostapd.service", "dnsmasq.service"))
         run(("systemctl", "disable", "hostapd.service", "dnsmasq.service"))
-
-        # Reload daemons (for dhcpcd)
-        run(("systemctl", "daemon-reload"))
+        run(("service", "dhcpcd", "start"))
 
         run(("wpa_cli", "-i", self.interface, "reconfigure"))
 
@@ -71,21 +71,22 @@ class WifiController(object):
         # while not_connected():
         #     time.sleep(1)
 
-        print("CLI mode set, please reboot")
-
     def set_ap_mode(self):
         """Goes into AP_MODE, i.e. provides a wifi by itself."""
+        run(("dhcpcd", "--release", self.interface))
+        run(("service", "dhcpcd", "stop"))
+
         # reconfigure dhcpcd.conf
         with open(self.DHCPCD_CONF, "a") as f:
-            f.write("#<begin_raspiwifi_entry>\n"
+            f.write("#<begin_sun2plug_entry>\n"
                     + self.dhcpcd_conf_entry + "\n"
-                    + "#<end_raspiwifi_entry>\n")
-        run(("service", "dhcpcd", "restart"))
+                    + "#<end_sun2plug_entry>\n")
+        # run(("service", "dhcpcd", "restart"))
 
         # Enable hostapd and dnsmasq services
         run(("systemctl", "enable", "hostapd.service", "dnsmasq.service"))
         run(("systemctl", "start", "hostapd.service", "dnsmasq.service"))
-        print("AP mode set, please reboot")
+        run(("service", "dhcpcd", "start"))
 
     def get_mode(self):
         if subprocess.call(["systemctl", "-q", "is-active", "hostapd"]) == 0:
