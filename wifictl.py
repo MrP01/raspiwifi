@@ -2,6 +2,7 @@
 """Helpers to control the Wifi interface(s) of a Raspberry Pi"""
 import re
 import subprocess
+import time
 
 import wifi
 
@@ -53,17 +54,15 @@ class WifiController(object):
         # Hashes the password (-> PSK) and generates an entry for wpa_supplicant.conf
         entry = run(("/usr/bin/wpa_passphrase", ssid, password)).decode()
         entry = re.sub(r'\t*#psk="[^\n"]+"\n', "", entry)  # removes plain text password
-        replace_in_file(self.WPA_SUPPLICANT_CONF, r"#<begin_sun2plug_entry>.+#<end_sun2plug_entry>", "", regex=True)
-        with open(self.WPA_SUPPLICANT_CONF, "a") as wpa_sup:
-            wpa_sup.write("\n#<begin_sun2plug_entry>\n" + entry + "#<end_sun2plug_entry>\n")
+        self.add_entry_to_config(entry, self.WPA_SUPPLICANT_CONF)
 
-        replace_in_file(self.DHCPCD_CONF, r"#<begin_sun2plug_entry>.+#<end_sun2plug_entry>", "", regex=True)
-        # run(("service", "dhcpcd", "restart"))
+        self.remove_entry_from_config(self.DHCPCD_CONF)
 
         # Stop & disable hostapd and dnsmasq services
         run(("systemctl", "stop", "hostapd.service", "dnsmasq.service"))
         run(("systemctl", "disable", "hostapd.service", "dnsmasq.service"))
         run(("service", "dhcpcd", "start"))
+        time.sleep(3)
 
         run(("wpa_cli", "-i", self.interface, "reconfigure"))
 
@@ -76,12 +75,7 @@ class WifiController(object):
         run(("dhcpcd", "--release", self.interface))
         run(("service", "dhcpcd", "stop"))
 
-        # reconfigure dhcpcd.conf
-        with open(self.DHCPCD_CONF, "a") as f:
-            f.write("#<begin_sun2plug_entry>\n"
-                    + self.dhcpcd_conf_entry + "\n"
-                    + "#<end_sun2plug_entry>\n")
-        # run(("service", "dhcpcd", "restart"))
+        self.add_entry_to_config(self.dhcpcd_conf_entry, self.DHCPCD_CONF)
 
         # Enable hostapd and dnsmasq services
         run(("systemctl", "enable", "hostapd.service", "dnsmasq.service"))
@@ -99,6 +93,18 @@ class WifiController(object):
         replace_in_file(self.HOSTAPD_CONF, r"\bwpa_passphrase=[^\n]+\b", "wpa_passphrase=%s" % wifi_password,
                         regex=True)
         run(("systemctl", "restart", "hostapd.service"))
+
+    @staticmethod
+    def add_entry_to_config(entry, filepath, identifier="rpiwifi"):
+        WifiController.remove_entry_from_config(filepath, identifier)
+        with open(filepath, "a") as f:
+            f.write("#<begin_{id}_entry>\n".format(id=identifier)
+                    + entry + "\n"
+                    + "#<end_{id}_entry>\n".format(id=identifier))
+
+    @staticmethod
+    def remove_entry_from_config(filepath, identifier="rpiwifi"):
+        replace_in_file(filepath, r"#<begin_{id}_entry>.+#<end_{id}_entry>".format(id=identifier), "", regex=True)
 
 
 if __name__ == '__main__':
