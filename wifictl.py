@@ -108,7 +108,10 @@ class WifiController(object):
 
 
 if __name__ == '__main__':
-    import argparse, sys
+    import argparse, sys, os
+
+    if os.geteuid() != 0:
+        exit("You need to have root privileges to run this script.\nPlease try again, this time using 'sudo'. Exiting.")
 
     wifi_controller = WifiController()
 
