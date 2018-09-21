@@ -5,6 +5,7 @@ import subprocess
 import time
 
 import wifi
+import wifi.exceptions
 
 run = subprocess.check_output
 
@@ -43,9 +44,17 @@ class WifiController(object):
         self.dhcpcd_conf_entry = DHCPCD_CONF_ENTRY_TEMPLATE.format(iface=self.interface).strip()
 
     def list_available_wifis(self):
-        cells = wifi.Cell.all(self.interface)
-        unique_cells = {cell.ssid: cell for cell in cells}.values()
-        return list(unique_cells)
+        cells = []
+        for i in range(3):
+            try:
+                cells = wifi.Cell.all(self.interface)
+                break
+            except wifi.exceptions.InterfaceError:
+                run(("ifconfig", self.interface, "up"))
+                time.sleep(2)
+        unique_cells = list({cell.ssid: cell for cell in cells}.values())
+        unique_cells.sort(key=lambda cell: cell.quality, reverse=True)
+        return unique_cells
 
     def set_cli_mode(self, ssid, password):
         """Goes into CLI_MODE, i.e. connects to an available wifi network using the given ssid and password."""
