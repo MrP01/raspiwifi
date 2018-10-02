@@ -56,14 +56,16 @@ class WifiController(object):
         unique_cells.sort(key=lambda cell: cell.quality, reverse=True)
         return unique_cells
 
-    def set_cli_mode(self, ssid, password):
+    def set_cli_mode(self, ssid=None, password=None):
         """Goes into CLI_MODE, i.e. connects to an available wifi network using the given ssid and password."""
         run(("dhcpcd", "--release", self.interface))
         run(("service", "dhcpcd", "stop"))
-        # Hashes the password (-> PSK) and generates an entry for wpa_supplicant.conf
-        entry = run(("/usr/bin/wpa_passphrase", ssid, password)).decode()
-        entry = re.sub(r'\t*#psk="[^\n"]+"\n', "", entry)  # removes plain text password
-        self.add_entry_to_config(entry, self.WPA_SUPPLICANT_CONF)
+
+        if ssid:
+            # Hashes the password (-> PSK) and generates an entry for wpa_supplicant.conf
+            entry = run(("/usr/bin/wpa_passphrase", ssid, password)).decode()
+            entry = re.sub(r'\t*#psk="[^\n"]+"\n', "", entry)  # removes plain text password
+            self.add_entry_to_config(entry, self.WPA_SUPPLICANT_CONF)
 
         self.remove_entry_from_config(self.DHCPCD_CONF)
 
@@ -132,8 +134,8 @@ if __name__ == '__main__':
     list_parser.set_defaults(func=wifi_controller.list_available_wifis)
 
     set_cli_mode_parser = subparsers.add_parser("set_cli_mode")
-    set_cli_mode_parser.add_argument("ssid", type=str)
-    set_cli_mode_parser.add_argument("password", type=str)
+    set_cli_mode_parser.add_argument("ssid", type=str, nargs="?")
+    set_cli_mode_parser.add_argument("password", type=str, nargs="?")
     set_cli_mode_parser.set_defaults(func=wifi_controller.set_cli_mode)
 
     set_ap_mode_parser = subparsers.add_parser("set_ap_mode")
