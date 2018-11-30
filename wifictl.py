@@ -103,7 +103,8 @@ class WifiController(object):
         replace_in_file(self.HOSTAPD_CONF, r"\bssid=[^\n]+\b", "ssid=%s" % wifi_name, regex=True)
         replace_in_file(self.HOSTAPD_CONF, r"\bwpa_passphrase=[^\n]+\b", "wpa_passphrase=%s" % wifi_password,
                         regex=True)
-        run(("systemctl", "restart", "hostapd.service"))
+        if self.get_mode() == WifiController.AP_MODE:
+            run(("systemctl", "restart", "hostapd.service"))
 
     @staticmethod
     def add_entry_to_config(entry, filepath, identifier="rpiwifi"):
