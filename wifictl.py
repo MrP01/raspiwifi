@@ -60,7 +60,7 @@ class WifiController(object):
         """Goes into CLI_MODE, i.e. connects to an available wifi network using the given ssid and password."""
         if not password:
             print("[WARNING] Unencrypted networks are not implemented yet.")  # TODO
-            return
+            return False
 
         run(("dhcpcd", "--release", self.interface))
         run(("service", "dhcpcd", "stop"))
@@ -84,6 +84,7 @@ class WifiController(object):
         # TODO
         # while not_connected():
         #     time.sleep(1)
+        return True
 
     def set_ap_mode(self):
         """Goes into AP_MODE, i.e. provides a wifi by itself."""
